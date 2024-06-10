@@ -125,7 +125,7 @@ struct rlist box_on_shutdown_trigger_list =
 struct event *box_on_shutdown_event = NULL;
 
 const struct vclock *box_vclock = instance_vclock;
-struct vclock *instance_vclock = &instance_vclock_storage;
+const struct vclock *instance_vclock = &instance_vclock_storage;
 
 const char *box_auth_type;
 
@@ -4974,6 +4974,26 @@ bootstrap_journal_write(struct journal *base, struct journal_entry *entry)
 }
 
 /**
+ * Initial join rows are coming from a remote master and can include meta data
+ * like pure vclock updates.
+ */
+static int
+initial_join_journal_write(struct journal *base, struct journal_entry *entry)
+{
+	assert(entry->n_rows == 1);
+	struct xrow_header *row = entry->rows[0];
+	/*
+	 * During initial join the remote master sends vclock of the snapshot.
+	 * It goes into the journal vclock via the journal API so as applier
+	 * wouldn't have to touch the instance's vclock manually.
+	 */
+	if (row->type == IPROTO_OK &&
+	    xrow_decode_vclock(row, &instance_vclock_storage) != 0)
+		return -1;
+	return bootstrap_journal_write(base, entry);
+}
+
+/**
  * Wait until every remote peer that managed to connect chooses this node as its
  * bootstrap leader and fail otherwise.
  */
@@ -5111,7 +5131,13 @@ bootstrap_from_master(struct replica *master)
 	say_info("bootstrapping replica from %s at %s",
 		 tt_uuid_str(&master->uuid),
 		 sio_strfaddr(&applier->addr, applier->addr_len));
-
+	struct journal initial_join_journal;
+	journal_create(&initial_join_journal, NULL, initial_join_journal_write);
+	journal_set(&initial_join_journal);
+	struct journal *old_journal = current_journal;
+	auto initial_join_journal_guard = make_scoped_guard([old_journal] {
+		journal_set(old_journal);
+	});
 	/*
 	 * Send JOIN request to master
 	 * See box_process_join().
@@ -5134,7 +5160,8 @@ bootstrap_from_master(struct replica *master)
 					APPLIER_FETCHED_SNAPSHOT :
 					APPLIER_FINAL_JOIN;
 	applier_resume_to_state(applier, wait_state, TIMEOUT_INFINITY);
-
+	initial_join_journal_guard.is_active = false;
+	journal_set(old_journal);
 	box_run_on_recovery_state(RECOVERY_STATE_SNAPSHOT_RECOVERED);
 
 	/*

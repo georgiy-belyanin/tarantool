@@ -70,7 +70,7 @@ extern const struct vclock *box_vclock;
  * recovery this vclock points to the end of WAL, not to the current recovery
  * position.
  */
-extern struct vclock *instance_vclock;
+extern const struct vclock *instance_vclock;
 
 /**
  * Name of the authentication method that is currently used on
