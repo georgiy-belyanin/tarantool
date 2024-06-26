@@ -265,6 +265,7 @@ luaL_pushcdata
 luaL_pushint64
 luaL_pushuint64
 luaL_setcdatagc
+luaL_tocpointer
 luaL_toint64
 luaL_touint64
 luaT_call
