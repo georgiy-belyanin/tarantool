@@ -94,11 +94,15 @@ local function is_candidate_checked(candidate)
            conn.state == 'closed'
 end
 
-local function connect_to_candidates(candidates)
+-- This method connects to all of the specified instances
+-- and returns the set of successfully connected ones.
+local function acquire_all_instances(instance_names)
+    if next(instance_names) == nil then return {} end
+
     local delay = WATCHER_DELAY
     local connect_deadline = clock.monotonic() + WATCHER_TIMEOUT
 
-    for _, instance_name in pairs(candidates) do
+    for _, instance_name in pairs(instance_names) do
         pcall(connect, instance_name, {
             wait_connected = false,
             connect_timeout = WATCHER_TIMEOUT
@@ -109,11 +113,11 @@ local function connect_to_candidates(candidates)
 
     local connected_candidates = {}
     while clock.monotonic() < connect_deadline do
-        connected_candidates = fun.iter(candidates)
+        connected_candidates = fun.iter(instance_names)
             :filter(is_candidate_connected)
             :totable()
 
-        local all_checked = fun.iter(candidates)
+        local all_checked = fun.iter(instance_names)
             :all(is_candidate_checked)
 
         if all_checked then
@@ -210,9 +214,10 @@ local function is_candidate_match_static(names, opts)
 end
 
 local function is_mode_match(mode, instance_name)
-    if mode == nil then
-        return true
-    end
+    if mode == nil then return true end
+    -- The instance should be alive to match its mode.
+    assert(mode == 'ro' or mode == 'rw')
+
     local conn = connections[instance_name]
     assert(conn ~= nil)
     return conn:mode() == mode
@@ -232,12 +237,21 @@ local function filter(opts)
         roles = '?table',
         sharding_roles = '?table',
         mode = '?string',
+        skip_connection_check = '?boolean'
     })
     opts = opts or {}
+
     if opts.mode ~= nil and opts.mode ~= 'ro' and opts.mode ~= 'rw' then
         local msg = 'Expected nil, "ro" or "rw", got "%s"'
         error(msg:format(opts.mode), 0)
     end
+
+    if opts.skip_connection_check and opts.mode ~= nil then
+        local msg = 'Filtering by mode "%s" requires the connection ' ..
+                    'check disabled by the "skip_connection_check" option'
+        error(msg:format(opts.mode), 0)
+    end
+
     if opts.sharding_roles ~= nil then
         for _, sharding_role in ipairs(opts.sharding_roles) do
             if sharding_role == 'rebalancer' then
@@ -271,13 +285,17 @@ local function filter(opts)
             table.insert(static_candidates, instance_name)
         end
     end
-    -- Return if retrieving dynamic information is not required.
-    if next(static_candidates) == nil or next(dynamic_opts) == nil then
+
+    -- Return if the connection check isn't needed.
+    if opts.skip_connection_check then
         return static_candidates
     end
 
     -- Filter the remaining candidates after connecting to them.
-    local connected_candidates = connect_to_candidates(static_candidates)
+    --
+    -- The acquire_all_instances() call returns quickly if it
+    -- receives empty table as an argument.
+    local connected_candidates = acquire_all_instances(static_candidates)
     local dynamic_candidates = {}
     for _, instance_name in pairs(connected_candidates) do
         if is_candidate_match_dynamic(instance_name, dynamic_opts) then
@@ -309,7 +327,7 @@ local function get_connection(opts)
     -- Initialize the weight of each candidate.
     local weights = {}
     if opts.mode == 'prefer_rw' or opts.mode == 'prefer_ro' then
-        candidates = connect_to_candidates(candidates)
+        candidates = acquire_all_instances(candidates)
     end
     for _, instance_name in pairs(candidates) do
         weights[instance_name] = 0
