@@ -450,6 +450,21 @@ local function atomic_tail(level, options, status, ...)
     end
 end
 
+--- Execute a function, acting as if the function starts with an implicit
+--- box.begin() and ends with an implicit box.commit() if successful, or ends
+--- with an implicit box.rollback() if there is an error.
+---
+--- **Possible errors:**
+--- * Error and abort the transaction in case of a conflict.
+--- * Error if the operation fails to write to disk.
+--- * Error if for some reason memory cannot be allocated.
+---
+--- Since 2.10.1
+---
+--- @param opts { txn_isolation: txn_isolation }
+--- @param tx_function fun(...: any): ...?
+--- @param ... any
+--- @return ...? The result of the function passed to atomic() as an argument.
 box.atomic = function(arg0, arg1, ...)
     -- There are two cases:
     -- 1. arg0 is a function (callable in general) while arg1,... are arguments.
@@ -840,7 +855,31 @@ local function check_space_type(space_type, level)
               table.concat(space_types, "', '") .. "'.", level + 1)
 end
 
+--- @class SpaceFieldFormat
+--- @field name? string value may be any string, provided that two fields do not have the same name
+--- @field type? "any" | "unsigned" | "string" | "integer" | "number"
+---  | "varbinary" | "boolean" | "double" | "decimal" | "uuid" | "array" 
+---  | "map" | "scalar" value may be any of allowed types
+--- @field is_nullable? boolean
+
+--- @alias SpaceFormat SpaceFieldFormat[] field names and types: See the illustrations of format clauses in the space_object:format() description and in the box.space._space example. Optional and usually not specified.
+
+--- @class SpaceCreateOptions
+--- @field engine? "memtx"|"vinyl" (Default: `memtx`)
+--- @field field_count? number fixed count of fields: for example if field_count=5, it is illegal to insert a tuple with fewer than or more than 5 fields
+--- @field format? SpaceFormat
+--- @field id? number (Default: last space’s id, +1) unique identifier: users can refer to spaces with the id instead of the name
+--- @field if_not_exists? boolean (Default: false) create space only if a space with the same name does not exist already, otherwise do nothing but do not cause an error
+--- @field is_local? boolean (Default: false) space contents are replication-local: changes are stored in the write-ahead log of the local node but there is no replication.
+--- @field is_sync? boolean (Default: false) any transaction doing a DML request on this space becomes synchronous
+--- @field temporary? boolean (Default: false) space contents are temporary: changes are not stored in the write-ahead log and there is no replication. Note regarding storage engine: vinyl does not support temporary spaces.
+--- @field user? string (Default: current user’s name) name of the user who is considered to be the space’s owner for authorization purposes
+
 box.schema.space = {}
+
+---@param name string
+---@param options? SpaceCreateOptions
+---@return table
 box.schema.space.create = function(name, options)
     utils.box_check_configured(2)
     check_param(name, 'name', 'string', 2)
@@ -947,6 +986,9 @@ end
 
 box.schema.create_space = box.schema.space.create
 
+---Drop a space.
+---
+---The method is performed in background and doesn’t block consequent requests.
 box.schema.space.drop = atomic_wrapper(function(space_id, space_name, opts)
     check_param(space_id, 'space_id', 'number', 2)
     opts = opts or {}
@@ -1001,6 +1043,9 @@ box.schema.space.drop = atomic_wrapper(function(space_id, space_name, opts)
     feedback_save_event('drop_space')
 end)
 
+--- Rename a space.
+---
+--- @param space_name string
 box.schema.space.rename = function(space_id, space_name)
     utils.box_check_configured(2)
     check_param(space_id, 'space_id', 'number', 2)
@@ -2755,6 +2800,11 @@ space_mt.jselect = function(space, key, opts, fselect_opts)
     check_space_arg(space, 'select', 2)
     return check_primary_index(space, 2):jselect(key, opts, fselect_opts)
 end
+
+--- Insert a tuple into a space.
+---
+--- @param tuple Tuple | Tuple[] tuple to be inserted.
+--- @return Tuple | Tuple[] the inserted tuple
 space_mt.insert = function(space, tuple)
     check_space_arg(space, 'insert', 2)
     return internal.insert(space.id, tuple);

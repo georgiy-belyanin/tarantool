@@ -164,6 +164,22 @@ local function stream_index_serialize(self)
     return self._src
 end
 
+--- @alias ConnectionState
+--- | 'active'
+--- | 'fetch_schema'
+--- | 'error'
+--- | 'error_reconnect'
+--- | 'closed'
+--- | 'initial'
+--- | 'graceful_shutdown'
+
+--- @class Connection
+--- @field host string
+--- @field port string
+--- @field state ConnectionState
+--- @field error string
+--- @field peer_uuid string|nil
+--- @field _fiber? Fiber
 local remote_methods = {}
 local remote_mt = {
     __index = remote_methods, __serialize = remote_serialize,
@@ -465,17 +481,22 @@ local function new_sm(uri_or_fd, opts)
     return remote
 end
 
---
--- Connect to a remote server.
--- @param uri OR host and port. URI is a string like
---        hostname:port@login:password. Host and port can be
---        passed separately with login and password in the next
---        parameter.
--- @param opts Options like reconnect_after, connect_timeout,
---        wait_connected, login, password, ...
---
--- @retval Net.box object.
---
+--- Create a new connection.
+---
+--- The connection is established on demand, at the
+--- time of the first request. It can be re-established automatically after a 
+--- disconnect (see `reconnect_after` option below). 
+---
+--- The returned connection object supports methods for making remote requests,
+--- such as select, update or delete.
+---
+--- @type fun(uri: Uri | UriString, options?: {
+---     wait_connected?: boolean|number,
+---     reconnect_after?: number,
+---     user?: string,
+---     password?: string,
+---     connect_timeout?: number,
+--- }): Connection
 local function connect(...)
     local uri, opts = parse_connect_params(...)
     check_param_table(opts, CONNECT_OPTION_TYPES)

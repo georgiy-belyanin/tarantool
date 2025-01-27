@@ -55,6 +55,7 @@ end
 
 -- }}} Helpers
 
+---@class Config
 local methods = {}
 local mt = {
     __index = methods,
@@ -417,12 +418,18 @@ function methods._print_env_list(self)
     io.stdout:write(env_source:_env_list())
 end
 
--- Note: There is a difference between missing opts.instance and
--- opts.instance that is equal to the given instance name. The
--- former returns an instance configuration taking into account
--- instance configuration sources (environment variables). The
--- latter takes into account only cluster configuration, so the
--- environment variables are ignored.
+--- Get a configuration applied to the current or remote instance.
+---
+--- Note the following differences between getting a configuration for
+--- the current and remote instance:
+--- * For the current instance, `get()` returns its configuration
+---   considering environment variables.
+--- * For a remote instance, get() only considers a cluster
+---   configuration and ignores environment variables.
+---
+---@param path string | string[] a configuration option name
+---@param opts? { instance?: string } options to pass
+---@return any
 function methods.get(self, path, opts)
     selfcheck(self, 'get')
     initcheck(self, 'get', 'instance')
@@ -473,6 +480,14 @@ function methods._reload_noexc(self, opts)
     return ok, err
 end
 
+--- Reload the current instance’s configuration.
+---
+--- Below are a few use cases when this function can be used:
+--- * A configuration option value specific to this instance is changed
+---   in a cluster’s configuration.
+--- * A new instance is added to a replica set.
+--- * A centralized configuration with turned-off configuration
+---   reloading is updated. Learn more at Reloading configuration.
 function methods.reload(self)
     selfcheck(self, 'reload')
     local ok, err = self:_reload_noexc({sync_source = 'all'})
@@ -494,6 +509,15 @@ function methods._hierarchy_info(self)
     }
 end
 
+--- Get the current instance’s state in regard to configuration.
+---
+---@param version? 'v1' | 'v2' (since 3.1.0) the version of the
+--- information that should be returned.
+---@return {
+---     status: 'ready' | 'check_warnings' | 'errors',
+---     meta: table,
+---     alerts: table[],
+---}
 function methods.info(self, version)
     selfcheck(self, 'info')
     version = version == nil and 'v1' or version
@@ -544,18 +568,10 @@ function methods._cconfig(self)
     return self._configdata_applied:cconfig()
 end
 
--- List all instances of the cluster.
---
--- Returns a table of the following format.
---
--- {
---     [<instance_name>] = {
---         instance_name = <...>,
---         replicaset_name = <...>,
---         group_name = <...>,
---     },
---     <...>
--- }
+--- List all instances of the cluster.
+---
+---@return { insance_name: string, replicaset_name: string,
+---          group_name: string }[]
 function methods.instances(self)
     selfcheck(self, 'instances')
     initcheck(self, 'instances', 'cluster')
@@ -578,6 +594,12 @@ function methods.instances(self)
     return res
 end
 
+--- Get a URI of the current or remote instance.
+---
+---@param uri_type 'peer' | 'sharding' a URI type
+---@param opts { instance: string } the name of a remote instance whose
+--- URI should be obtained
+---@return URIFormat
 function methods.instance_uri(self, uri_type, opts)
     selfcheck(self, 'instance_uri')
     initcheck(self, 'instance_uri', 'cluster')
@@ -614,6 +636,7 @@ end
 
 -- The object is a singleton. The constructor should be called
 -- only once.
+---@type fun(): Config
 local function new()
     local self = setmetatable({
         _sources = {},

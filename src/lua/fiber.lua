@@ -51,18 +51,43 @@ compat.add_option({
     run_action_now = true,
 })
 
+--- Return current system time (in seconds since the epoch) as a Lua number. The
+--- time is taken from the event loop clock, which makes this call very cheap,
+--- but still useful for constructing artificial tuple keys.
+---
+--- @return number
 local function fiber_time()
-    return tonumber(C.fiber_time())
+    return tonumber(C.fiber_time()) --[[@as number]]
 end
 
+--- Return current system time (in microseconds since the epoch) as a 64-bit
+--- integer. The time is taken from the event loop clock.
+---
+--- @return int64_t
 local function fiber_time64()
     return C.fiber_time64()
 end
 
+--- Get the monotonic time in seconds.
+---
+--- It is better to use `fiber.clock()` for calculating timeouts instead of
+--- `fiber.time()` because `fiber.time()` reports real time so it is affected
+--- by system time changes.
+---
+--- @return number
+---
+--- @see fiber.time()
 local function fiber_clock()
-    return tonumber(C.fiber_clock())
+    return tonumber(C.fiber_clock()) --[[@as number]]
 end
 
+--- Same as `fiber.clock()` but in microseconds. Return a number of seconds as
+--- 64-bit integer, representing elapsed wall-clock time since some time in the
+--- past that is guaranteed not to change during the life of the process.
+---
+--- @return int64_t
+---
+--- @see fiber.clock()
 local function fiber_clock64()
     return C.fiber_clock64()
 end
