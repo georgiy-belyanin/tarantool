@@ -6,6 +6,7 @@
 [![Telegram][telegram-badge]][telegram-url]
 [![GitHub Discussions][discussions-badge]][discussions-url]
 [![Stack Overflow][stackoverflow-badge]][stackoverflow-url]
+[![VS Code Extension][vscode-extension-badge]][vscode-extension-url]
 
 [Tarantool][tarantool-url] is an in-memory computing platform consisting of a
 database and an application server.
@@ -75,6 +76,8 @@ Thank you for your interest in Tarantool!
 [stackoverflow-url]: https://stackoverflow.com/questions/tagged/tarantool
 [oss-fuzz-badge]: https://oss-fuzz-build-logs.storage.googleapis.com/badges/tarantool.svg
 [oss-fuzz-url]: https://oss-fuzz.com/coverage-report/job/libfuzzer_asan_tarantool/latest
+[vscode-extension-badge]: https://img.shields.io/badge/VS_Code_Extension-Marketplace-0078D7
+[vscode-extension-url]: https://marketplace.visualstudio.com/items?itemName=tarantool.tarantool
 [tarantool-url]: https://www.tarantool.io/en/
 [license]: LICENSE
 [modules]: https://www.tarantool.io/en/download/rocks
