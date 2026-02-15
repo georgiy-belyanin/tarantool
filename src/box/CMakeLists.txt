@@ -191,6 +191,8 @@ set(box_sources
     memtx_hash.cc
     memtx_tree.cc
     memtx_rtree.cc
+    memtx_vector.cc
+    ../../third_party/USearch/c/lib.cpp
     memtx_bitset.cc
     memtx_tx.c
     module_cache.c
