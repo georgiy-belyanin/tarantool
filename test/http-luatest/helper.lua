@@ -12,6 +12,13 @@ local repo_root = fio.cwd()
 local http_root = fio.pathjoin(repo_root, 'third_party', 'http')
 os.setenv('LUA_SOURCE_DIR', http_root)
 
+-- The upstream tests check the bundled implementation, not the public
+-- http.server facade. The modules in this directory provide it under
+-- the names of the http rock, and an installed rock takes precedence
+-- over the facade.
+local rock_root = fio.pathjoin(repo_root, 'test', 'http-luatest', 'rock')
+package.path = rock_root .. '/?.lua;' .. package.path
+
 local function glob_recursive(path)
     local pattern = path
     local result = {}
@@ -78,7 +85,8 @@ end
 preload_from_file('test.helpers', 'third_party/http/test/helpers.lua',
                   function(helpers)
     helpers.update_lua_env_variables = function(server)
-        server.env.LUA_PATH = http_root .. '/?.lua;' ..
+        server.env.LUA_PATH = rock_root .. '/?.lua;' ..
+                              http_root .. '/?.lua;' ..
                               repo_root .. '/?.lua;' ..
                               repo_root .. '/?/init.lua;' ..
                               (server.env.LUA_PATH or '')

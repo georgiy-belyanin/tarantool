@@ -147,6 +147,7 @@ extern char minifio_lua[],
 	http_mime_types_lua[],
 	http_sslsocket_lua[],
 	http_server_lua[],
+	http_server_facade_lua[],
 	http_version_lua[],
 	log_lua[],
 	uri_lua[],
@@ -236,7 +237,8 @@ static const char * const lua_modules_minimal[] = {
 	"http.mime_types", http_mime_types_lua,
 	"http.sslsocket", http_sslsocket_lua,
 	"http.version", http_version_lua,
-	"http.server", http_server_lua,
+	"internal.http.server", http_server_lua,
+	"internal.http.facade", http_server_facade_lua,
 	NULL
 };
 
